@@ -1,0 +1,21 @@
+2026-11-14T20:34:51.198+00:00 UP   outage_s=0.00
+2026-11-14T20:40:16.675+00:00 DOWN status=0 error=ReadTimeout
+2026-11-14T20:40:24.277+00:00 UP   outage_s=7.60
+2026-11-14T20:40:44.630+00:00 DOWN status=0 error=ReadTimeout
+2026-11-14T20:45:46.863+00:00 UP   outage_s=302.23
+2026-11-14T20:45:47.864+00:00 DOWN status=0 error=ReadTimeout
+2026-11-14T20:50:45.802+00:00 UP   outage_s=297.94
+2026-11-14T20:51:25.809+00:00 DOWN status=0 error=ConnectTimeout
+2026-11-14T20:51:34.822+00:00 UP   outage_s=9.01
+2026-11-14T20:51:40.823+00:00 DOWN status=0 error=ReadTimeout
+2026-11-14T20:51:49.847+00:00 UP   outage_s=9.02
+2026-11-14T20:51:55.848+00:00 DOWN status=0 error=ConnectTimeout
+2026-11-14T20:52:03.360+00:00 UP   outage_s=7.51
+2026-11-14T21:38:44.960+00:00 DOWN status=0 error=ConnectTimeout
+2026-11-14T21:38:52.475+00:00 UP   outage_s=7.51
+2026-11-16T19:51:16.295+00:00 DOWN status=0 error=ConnectTimeout
+2026-11-16T20:20:13.317+00:00 UP   outage_s=0.00
+2026-11-16T20:28:47.411+00:00 DOWN status=0 error=ConnectTimeout
+2026-11-16T20:28:56.425+00:00 UP   outage_s=9.01
+2026-11-16T20:29:18.429+00:00 DOWN status=0 error=ConnectTimeout
+2026-11-16T20:29:36.459+00:00 UP   outage_s=18.03

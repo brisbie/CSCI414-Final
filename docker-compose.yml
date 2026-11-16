@@ -1,0 +1,126 @@
+# ShopNet: e-commerce order platform on a routed, segmented network
+# CSCI 414/514 Final Practical Exam, Option 04
+#
+#   client zone   10.41.1.0/24   client (10.41.1.10)
+#   service zone  10.41.2.0/24   api    (10.41.2.10)   HTTPS :8443
+#   data zone     10.41.3.0/24   mongo  (10.41.3.10)   :27017
+#   ops zone      10.41.4.0/24   ops    (10.41.4.10)   monitor / import / analysis
+#   router        10.41.{1,2,3,4}.254  forwards between all four, enforces nftables
+#
+# No ports are published to the host: every test runs from the client container,
+# so all traffic crosses the router.
+
+name: shopnet
+
+x-common: &common
+  init: true
+  cap_add: [NET_ADMIN]
+  depends_on: [router]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  router:
+    build: { context: ., dockerfile: router/Dockerfile }
+    hostname: router
+    init: true
+    cap_add: [NET_ADMIN, NET_RAW]
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    volumes:
+      - ./router/nftables.conf:/etc/nftables.conf:ro
+      - ./evidence/pcap:/captures
+    networks:
+      client_net:  { ipv4_address: 10.41.1.254 }
+      service_net: { ipv4_address: 10.41.2.254 }
+      data_net:    { ipv4_address: 10.41.3.254 }
+      ops_net:     { ipv4_address: 10.41.4.254 }
+    restart: unless-stopped
+
+  mongo:
+    <<: *common
+    build: { context: ., dockerfile: mongo/Dockerfile }
+    hostname: mongo
+    environment:
+      ROUTE_VIA: 10.41.3.254
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:?run scripts/up.sh to create .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?run scripts/up.sh to create .env}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      data_net: { ipv4_address: 10.41.3.10 }
+    restart: "no"   # failures stay failed until our recovery tooling acts (Module F)
+
+  api:
+    <<: *common
+    build: { context: ., dockerfile: api/Dockerfile }
+    hostname: api
+    depends_on: [router, mongo]
+    environment:
+      ROUTE_VIA: 10.41.2.254
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db.shop.local:27017/?authSource=admin
+      MONGO_DB: shop
+    extra_hosts:
+      - "db.shop.local:10.41.3.10"
+    volumes:
+      - ./certs/api.crt:/certs/api.crt:ro
+      - ./certs/api.key:/certs/api.key:ro
+      - ./logs:/logs
+    networks:
+      service_net: { ipv4_address: 10.41.2.10 }
+    restart: "no"
+
+  client:
+    <<: *common
+    build: { context: ., dockerfile: client/Dockerfile }
+    hostname: client
+    cap_add: [NET_ADMIN, NET_RAW]
+    environment:
+      ROUTE_VIA: 10.41.1.254
+      API_URL: https://api.shop.local:8443
+      CA_CERT: /certs/ca.crt
+    extra_hosts:
+      - "api.shop.local:10.41.2.10"
+      - "db.shop.local:10.41.3.10"
+    volumes:
+      - ./certs/ca.crt:/certs/ca.crt:ro
+      - ./results:/results
+    networks:
+      client_net: { ipv4_address: 10.41.1.10 }
+
+  ops:
+    <<: *common
+    build: { context: ., dockerfile: ops/Dockerfile }
+    hostname: ops
+    depends_on: [router, mongo, api]
+    environment:
+      ROUTE_VIA: 10.41.4.254
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db.shop.local:27017/?authSource=admin
+      MONGO_DB: shop
+      HEALTH_URL: https://api.shop.local:8443/health
+      CA_CERT: /certs/ca.crt
+    extra_hosts:
+      - "api.shop.local:10.41.2.10"
+      - "db.shop.local:10.41.3.10"
+    volumes:
+      - ./certs/ca.crt:/certs/ca.crt:ro
+      - ./logs:/logs
+      - ./results:/results
+      - ./data:/data:ro
+    networks:
+      ops_net: { ipv4_address: 10.41.4.10 }
+    restart: unless-stopped
+
+networks:
+  client_net:
+    ipam: { config: [ { subnet: 10.41.1.0/24, gateway: 10.41.1.1 } ] }
+  service_net:
+    ipam: { config: [ { subnet: 10.41.2.0/24, gateway: 10.41.2.1 } ] }
+  data_net:
+    ipam: { config: [ { subnet: 10.41.3.0/24, gateway: 10.41.3.1 } ] }
+  ops_net:
+    ipam: { config: [ { subnet: 10.41.4.0/24, gateway: 10.41.4.1 } ] }
+
+volumes:
+  mongo_data:
